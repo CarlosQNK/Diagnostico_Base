@@ -40,7 +40,19 @@
     border:1.6px solid var(--line); border-radius:9px; background:var(--bg); color:var(--ink);
   }
   .field-block input:focus{ outline:none; border-color:var(--accent); background:#fff; }
-  .hint-small{ font-size:12px; color:var(--ink-soft); margin-top:-6px; }
+  .hint-small{ font-size:12px; color:var(--ink-soft); margin-top:6px; line-height:1.4; }
+
+  /* consentimiento */
+  .consent-text{
+    font-size:13.5px; line-height:1.6; color:var(--ink-soft); background:var(--bg);
+    border:1px solid var(--line); border-radius:12px; padding:16px 18px; margin-bottom:18px;
+  }
+  .consent-text p{ margin:0 0 10px; }
+  .consent-text p:last-child{ margin-bottom:0; }
+  .consent-text strong{ color:var(--ink); }
+  .checkbox-row{ display:flex; align-items:flex-start; gap:10px; margin-bottom:16px; }
+  .checkbox-row input[type="checkbox"]{ width:18px; height:18px; margin-top:2px; accent-color:var(--accent); flex-shrink:0; }
+  .checkbox-row label{ font-size:13.5px; color:var(--ink); line-height:1.5; }
 
   .btn{ font-family:'Public Sans',sans-serif; font-weight:700; font-size:14.5px; padding:12px 22px;
     border-radius:10px; border:none; cursor:pointer; transition:.15s; width:100%; }
@@ -109,32 +121,50 @@
 <body>
 <div class="wrap">
 
-  <div class="brand-eyebrow">Investigación · Nivelación → Primer nivel</div>
+  <div class="brand-eyebrow">Investigación educativa · Primer nivel de carrera</div>
   <h1>Diagnóstico de base matemática</h1>
   <p class="subtitle">22 ítems · aritmética, fracciones, álgebra y problemas de varios pasos.<br>Responde con tu mejor estimación — no hay corrección visible durante la prueba.</p>
 
+  <!-- ===== CONSENTIMIENTO ===== -->
+  <div class="phase card" id="phase-consent" style="display:block;">
+    <div class="consent-text">
+      <p><strong>Propósito.</strong> Este diagnóstico forma parte de una investigación educativa institucional sobre el nivel de base matemática de estudiantes que ingresan a primer nivel de carrera. Tu participación es voluntaria y no afecta tu calificación en ningún curso.</p>
+      <p><strong>Datos que se recogen.</strong> Tus respuestas a 22 ejercicios, el tiempo empleado por ítem, tu carrera, paralelo (si aplica) y, de forma opcional, tu sexo. Tu identificador institucional se transforma mediante una función hash antes de enviarse — no se transmite ni almacena en texto plano. Esto permite vincular tus resultados de forma seudónima (por ejemplo, si se aplica una segunda medición más adelante), sin exponer tu identidad directa a quienes analicen los datos.</p>
+      <p><strong>Uso de los datos.</strong> Los resultados se usan únicamente con fines de investigación y mejora educativa institucional, de forma agregada o seudónima. Puedes dejar de participar en cualquier momento simplemente cerrando esta ventana.</p>
+    </div>
+    <div class="checkbox-row">
+      <input type="checkbox" id="consentCheck">
+      <label for="consentCheck">He leído la información anterior y acepto participar voluntariamente en este diagnóstico.</label>
+    </div>
+    <button class="btn btn-primary" id="consentBtn" disabled onclick="showPhase('register')">Continuar →</button>
+  </div>
+
   <!-- ===== REGISTRO ===== -->
-  <div class="phase card" id="phase-register" style="display:block;">
+  <div class="phase card" id="phase-register">
     <div class="field-block">
       <div>
-        <label>Nombre completo</label>
-        <input type="text" id="regName" placeholder="Tu nombre">
-      </div>
-      <div>
-        <label>Código / Matrícula</label>
-        <input type="text" id="regCode" placeholder="Ej: 2026001">
+        <label>ID institucional</label>
+        <input type="text" id="regID" placeholder="Tu número de identificación institucional">
+        <p class="hint-small">Se transforma en un código no reversible antes de enviarse — nunca se guarda en texto plano.</p>
       </div>
       <div>
         <label>Carrera</label>
         <input type="text" id="regCarrera" placeholder="Ej: Ing. Mecatrónica">
       </div>
       <div>
-        <label>Paralelo / Grupo (opcional)</label>
-        <input type="text" id="regGrupo" placeholder="Ej: Paralelo A">
+        <label>NRC</label>
+        <input type="text" id="regNRC" placeholder="Ej: 1234">
+      </div>
+      <div>
+        <label>Sexo (opcional)</label>
+        <div class="choice-wrap" id="sexoWrap">
+          <button type="button" class="choice-btn" data-val="F">Femenino</button>
+          <button type="button" class="choice-btn" data-val="M">Masculino</button>
+          <button type="button" class="choice-btn" data-val="NA">Prefiero no decir</button>
+        </div>
       </div>
       <button class="btn btn-primary" onclick="startTest()">Comenzar diagnóstico →</button>
     </div>
-    <p class="hint-small" style="text-align:center;margin-top:16px;">Tus datos se usan únicamente con fines de investigación educativa institucional.</p>
   </div>
 
   <!-- ===== PRUEBA ===== -->
@@ -395,7 +425,7 @@ function b4_4(rng){
 const ITEM_GENERATORS = [b1_1,b1_2,b1_3,b1_4,b1_5,b1_6, b2_1,b2_2,b2_3,b2_4,b2_5,b2_6, b3_1,b3_2,b3_3,b3_4,b3_5,b3_6, b4_1,b4_2,b4_3,b4_4];
 
 /* ============ estado de sesión ============ */
-let session = { name:'',code:'',carrera:'',grupo:'',seed:0,items:[],index:0,responses:[],itemStart:0 };
+let session = { idHash:'',carrera:'',nrc:'',sexo:'',seed:0,items:[],index:0,responses:[],itemStart:0 };
 let currentValues = {};
 let sendStatus = 'idle';
 
@@ -404,15 +434,40 @@ function showPhase(p){
   document.getElementById('phase-'+p).style.display='block';
 }
 
-function startTest(){
-  const name=document.getElementById('regName').value.trim();
-  const code=document.getElementById('regCode').value.trim();
-  const carrera=document.getElementById('regCarrera').value.trim();
-  const grupo=document.getElementById('regGrupo').value.trim();
-  if(!name || !code){ alert('Completa al menos nombre y código.'); return; }
-  const seed = xmur3(code+'_diagbase')();
+/* ============ hash SHA-256 (Web Crypto API) ============ */
+async function sha256Hex(str){
+  const enc = new TextEncoder().encode(str);
+  const buf = await crypto.subtle.digest('SHA-256', enc);
+  return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
+}
+
+/* ============ consentimiento y selección de sexo ============ */
+document.getElementById('consentCheck').addEventListener('change', function(){
+  document.getElementById('consentBtn').disabled = !this.checked;
+});
+let selectedSexo = '';
+document.getElementById('sexoWrap').querySelectorAll('.choice-btn').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    selectedSexo = btn.dataset.val;
+    document.getElementById('sexoWrap').querySelectorAll('.choice-btn').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+  });
+});
+
+async function startTest(){
+  const idRaw = document.getElementById('regID').value.trim();
+  const carrera = document.getElementById('regCarrera').value.trim();
+  const nrc = document.getElementById('regNRC').value.trim();
+  if(!idRaw){ alert('Completa tu ID institucional.'); return; }
+  if(!crypto.subtle){
+    alert('Este navegador no puede procesar el ID de forma segura en esta página (requiere abrirla por https://, no como archivo local). Abre el enlace publicado en GitHub Pages.');
+    return;
+  }
+  const idHash = await sha256Hex(idRaw+'_diagbase');
+  const seed = parseInt(idHash.substring(0,8), 16);
   const rng = mulberry32(seed);
-  session = { name,code,carrera,grupo,seed, items: ITEM_GENERATORS.map(g=>g(rng)), index:0, responses:[], itemStart:Date.now() };
+  session = { idHash: idHash.substring(0,16), carrera, nrc, sexo:selectedSexo, seed,
+    items: ITEM_GENERATORS.map(g=>g(rng)), index:0, responses:[], itemStart:Date.now() };
   showPhase('test');
   renderItem();
 }
@@ -509,7 +564,7 @@ function buildPayload(){
   const byBlock={1:{c:0,t:0},2:{c:0,t:0},3:{c:0,t:0},4:{c:0,t:0}};
   session.responses.forEach(r=>{ byBlock[r.bloque].t++; byBlock[r.bloque].c+=r.correcto; });
   return {
-    nombre: session.name, codigo: session.code, carrera: session.carrera, grupo: session.grupo,
+    id_hash: session.idHash, carrera: session.carrera, nrc: session.nrc, sexo: session.sexo || 'NA',
     semilla: session.seed,
     bloque1_aritmetica: `${byBlock[1].c}/${byBlock[1].t}`,
     bloque2_fracciones: `${byBlock[2].c}/${byBlock[2].t}`,
@@ -566,7 +621,7 @@ function downloadCSV(){
   const blob = new Blob([csv], {type:'text/csv'});
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
-  a.href=url; a.download=`diagnostico_${session.code||'sesion'}.csv`; a.click();
+  a.href=url; a.download=`diagnostico_${session.idHash||'sesion'}.csv`; a.click();
 }
 </script>
 </body>
